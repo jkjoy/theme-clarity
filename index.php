@@ -3,8 +3,9 @@
 /**
  * Clarity
  * @package Clarity
- * @author Handsome & 纸鹿
+ * @author jkjoy
  * @version 1.0.1
+ * @link https://jkjoy.de
  */
 clarity_set('showAside', true);
 clarity_set('pageTitle', null);
