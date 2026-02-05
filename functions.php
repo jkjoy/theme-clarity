@@ -1853,15 +1853,27 @@ function clarity_moments_base_url(): string
 {
     $options = \Typecho\Widget::widget('Widget_Options');
     $indexBase = $options->index ?? '';
+    $templates = ['moments', 'page-moments', 'page-moments.php', 'moments.php'];
 
     try {
         $db = \Typecho\Db::get();
+        $select = $db->select()
+            ->from('table.contents')
+            ->where('table.contents.type = ?', 'page')
+            ->where('table.contents.status = ?', 'publish');
+
+        $templateConditions = [];
+        $templateParams = [];
+        foreach ($templates as $template) {
+            $templateConditions[] = 'table.contents.template = ?';
+            $templateParams[] = $template;
+        }
+        if (!empty($templateConditions)) {
+            $select->where('(' . implode(' OR ', $templateConditions) . ')', ...$templateParams);
+        }
+
         $row = $db->fetchRow(
-            $db->select()
-                ->from('table.contents')
-                ->where('table.contents.type = ?', 'page')
-                ->where('table.contents.status = ?', 'publish')
-                ->where('table.contents.template = ?', 'moments')
+            $select
                 ->order('table.contents.created', \Typecho\Db::SORT_DESC)
                 ->limit(1)
         );
@@ -1885,7 +1897,7 @@ function clarity_moments_base_url(): string
     } catch (\Throwable $e) {
     }
 
-    return \Typecho\Common::url('moments', $options->siteUrl);
+    return $options->siteUrl;
 }
 
 function clarity_moments_parse_tags($raw): array
