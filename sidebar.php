@@ -173,13 +173,13 @@ $renderIcon = function ($icon) {
           </div>
         </a>
       <?php else: ?>
-        <a class="user-entry" href="<?php echo $this->options->adminUrl; ?>">
+        <a class="user-entry" href="<?php echo $this->options->adminUrl; ?>" data-auth-trigger="sidebar-login">
           <div class="avatar-wrapper">
             <span class="icon-[ph--user-circle-bold] default-avatar-icon"></span>
           </div>
           <div class="user-info">
             <span class="user-name">登录</span>
-            <span class="user-desc">进入后台管理</span>
+            <span class="user-desc">点击登录账号</span>
           </div>
         </a>
       <?php endif; ?>

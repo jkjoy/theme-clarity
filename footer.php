@@ -13,6 +13,16 @@ $uptimeBadgeUrl = trim((string) clarity_opt('footer_uptime_kuma_badge', ''));
 $uptimeStatusUrl = trim((string) clarity_opt('footer_uptime_kuma_url', ''));
 $isLinksPage = clarity_get('isLinksPage', false);
 $linksRandom = clarity_bool(clarity_opt('links_random', '1'));
+$authError = '';
+if (isset($_COOKIE['__typecho_notice_type']) && $_COOKIE['__typecho_notice_type'] === 'error' && isset($_COOKIE['__typecho_notice'])) {
+  $noticeRaw = json_decode((string) $_COOKIE['__typecho_notice'], true);
+  if (is_array($noticeRaw) && isset($noticeRaw[0])) {
+    $authError = (string) $noticeRaw[0];
+  } elseif (is_string($noticeRaw)) {
+    $authError = $noticeRaw;
+  }
+}
+$authForgotUrl = rtrim((string) $this->options->adminUrl, '/') . '/forgot-password.php';
 $renderIcon = function ($icon) {
   $icon = trim((string) $icon);
   if ($icon === '') {
@@ -204,13 +214,53 @@ $renderIcon = function ($icon) {
     </div>
   </div>
 
+  <div id="auth-modal" class="auth-modal" style="display:none" aria-hidden="true">
+    <div class="auth-modal-overlay" data-auth-close></div>
+    <div class="auth-modal-content" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <button type="button" class="auth-modal-close" aria-label="关闭登录窗口" data-auth-close>
+        <span class="icon-[ph--x-bold]"></span>
+      </button>
+      <h3 id="auth-modal-title" class="auth-modal-title">登录</h3>
+      <form class="auth-form" method="post" action="<?php $this->options->loginAction(); ?>">
+        <?php if ($authError !== ''): ?>
+          <div class="auth-alert" role="alert"><?php echo htmlspecialchars($authError, ENT_QUOTES, 'UTF-8'); ?></div>
+        <?php endif; ?>
+        <label class="auth-form-label" for="auth-name">用户名或邮箱</label>
+        <input id="auth-name" class="auth-input" type="text" name="name" autocomplete="username" required />
+
+        <label class="auth-form-label" for="auth-password">密码</label>
+        <input id="auth-password" class="auth-input" type="password" name="password" autocomplete="current-password" required />
+
+        <label class="auth-form-check">
+          <input type="checkbox" name="remember" value="1" />
+          <span>下次自动登录</span>
+        </label>
+
+        <input id="auth-referer" type="hidden" name="referer" value="<?php echo htmlspecialchars($this->options->siteUrl, ENT_QUOTES, 'UTF-8'); ?>" />
+
+        <button class="auth-submit" type="submit">登录</button>
+      </form>
+      <div class="auth-extra-links">
+        <a href="<?php echo htmlspecialchars($authForgotUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">忘记密码</a>
+        <?php if ($this->options->allowRegister): ?>
+          <a href="<?php $this->options->registerUrl(); ?>">注册账号</a>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+
   <script>
+    window.updateModalBodyLock = window.updateModalBodyLock || function () {
+      const hasOpenModal = Array.from(document.querySelectorAll('.search-modal, .auth-modal')).some((modal) => modal && modal.style.display === 'flex');
+      document.body.style.overflow = hasOpenModal ? 'hidden' : '';
+    };
+
     window.SearchWidget = window.SearchWidget || {
       open: function () {
         const modal = document.getElementById('search-modal');
         if (!modal) return;
         modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        window.updateModalBodyLock();
         const input = modal.querySelector('.search-input');
         if (input) input.focus();
       },
@@ -218,9 +268,63 @@ $renderIcon = function ($icon) {
         const modal = document.getElementById('search-modal');
         if (!modal) return;
         modal.style.display = 'none';
-        document.body.style.overflow = '';
+        window.updateModalBodyLock();
       }
     };
+
+    window.AuthModal = window.AuthModal || {
+      open: function () {
+        const modal = document.getElementById('auth-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        const refererInput = document.getElementById('auth-referer');
+        if (refererInput) {
+          refererInput.value = window.location.href;
+        }
+        window.updateModalBodyLock();
+        const input = modal.querySelector('#auth-name');
+        if (input) input.focus();
+      },
+      close: function () {
+        const modal = document.getElementById('auth-modal');
+        if (!modal) return;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        window.updateModalBodyLock();
+      }
+    };
+
+    const authShouldOpen = <?php echo ($authError !== '') ? 'true' : 'false'; ?>;
+    if (authShouldOpen) {
+      window.AuthModal.open();
+    }
+
+    document.querySelectorAll('[data-auth-trigger]').forEach((trigger) => {
+      trigger.addEventListener('click', function (event) {
+        event.preventDefault();
+        window.AuthModal.open();
+      });
+    });
+
+    document.querySelectorAll('[data-auth-close]').forEach((trigger) => {
+      trigger.addEventListener('click', function () {
+        window.AuthModal.close();
+      });
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      const authModal = document.getElementById('auth-modal');
+      if (authModal && authModal.style.display === 'flex') {
+        window.AuthModal.close();
+        return;
+      }
+      const searchModal = document.getElementById('search-modal');
+      if (searchModal && searchModal.style.display === 'flex') {
+        window.SearchWidget.close();
+      }
+    });
 
     window.randomVisitLink = window.randomVisitLink || function () {
       const list = window.clarityLinks || [];

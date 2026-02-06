@@ -1,10 +1,9 @@
-<?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
-<?php
+<?php if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 /**
- * Clarity
+ * 基于 halo主题 Clarity 修改的 Typecho 主题
  * @package Clarity
  * @author jkjoy
- * @version 1.0.4
+ * @version 1.1.0
  * @link https://jkjoy.de
  */
 clarity_set('showAside', true);
