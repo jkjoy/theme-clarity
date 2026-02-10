@@ -163,6 +163,16 @@
   gap: 0.85rem;
 }
 
+.link-submit-form {
+  display: grid;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+}
+
+.link-submit-form .comment-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .comment-fields {
   display: grid;
   gap: 0.75rem;
@@ -407,6 +417,9 @@
 
 @media (max-width: 768px) {
   .comment-fields {
+    grid-template-columns: 1fr;
+  }
+  .link-submit-form .comment-fields {
     grid-template-columns: 1fr;
   }
   .comment-children {
