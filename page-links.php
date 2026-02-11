@@ -253,6 +253,7 @@ if (is_array($groups)) {
                   <input type="hidden" name="user" value="" />
                   <input type="hidden" name="do" value="submit" />
                   <div class="comment-actions">
+                    <?php if (class_exists('Enhancement_Plugin') && Enhancement_Plugin::turnstileReady()):echo Enhancement_Plugin::turnstileRenderBlock('link-submit'); endif; ?>
                     <button type="submit" class="z-btn primary" id="enhancement-submit-btn">
                       <span class="icon-[ph--paper-plane-right-bold]"></span>
                       <span>提交申请</span>
@@ -325,13 +326,11 @@ if (is_array($groups)) {
     if (enhancementForm) {
       const submitBtn = document.getElementById('enhancement-submit-btn');
       const messageBox = document.getElementById('submit-message');
+      const turnstileEl = enhancementForm.querySelector('.cf-turnstile');
       const iconMap = { success: '✓', error: '✕', info: 'i' };
 
       const showMessage = (text, type = 'info') => {
-        if (!messageBox) {
-          alert(text);
-          return;
-        }
+        if (!messageBox) return;
         messageBox.innerHTML = `<span class="msg-icon">${iconMap[type] || 'i'}</span><span class="msg-text">${text}</span>`;
         messageBox.className = `submit-message ${type}`;
         messageBox.style.display = 'flex';
@@ -348,6 +347,12 @@ if (is_array($groups)) {
           return;
         }
 
+        const token = enhancementForm.querySelector('input[name="cf-turnstile-response"]')?.value || '';
+        if (!token) {
+          showMessage('请先完成人机验证', 'error');
+          return;
+        }
+
         const originalHtml = submitBtn ? submitBtn.innerHTML : '';
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -361,10 +366,12 @@ if (is_array($groups)) {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             body: formData
           });
+
           const data = await response.json().catch(() => null);
           if (!response.ok || !data) {
             throw new Error('提交失败');
           }
+
           if (data.success) {
             showMessage(data.message || '提交成功，等待审核。', 'success');
             enhancementForm.reset();
@@ -377,6 +384,9 @@ if (is_array($groups)) {
           if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalHtml;
+          }
+          if (window.turnstile && turnstileEl) {
+            try { window.turnstile.reset(turnstileEl); } catch (e) {}
           }
         }
       });
