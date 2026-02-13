@@ -708,6 +708,22 @@ function themeConfig($form)
     );
     $form->addInput($enablePageJump);
 
+    $headhtml = new \Typecho\Widget\Helper\Form\Element\Textarea(
+        'clarity_headhtml',
+        null,
+        '',
+        _t('head中插入代码，支持HTML语法')
+    );
+    $form->addInput($headhtml);
+
+    $footerhtml = new \Typecho\Widget\Helper\Form\Element\Textarea(
+        'clarity_footerhtml',
+        null,
+        '',
+        _t('在页脚插入内容，支持HTML语法')
+    );
+    $form->addInput($footerhtml);
+
     $backupAction = new \Typecho\Widget\Helper\Form\Element\Hidden('clarity_backup_action', null, '');
     $backupAction->input->setAttribute('id', 'clarity-backup-action');
     $form->addInput($backupAction);

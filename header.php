@@ -39,6 +39,7 @@ $enableFancy = clarity_bool(clarity_opt('enable_fancybox', '0')) ? 'true' : 'fal
 $navActive = clarity_bool(clarity_opt('nav_active_indicator', '1')) ? 'true' : 'false';
 $pageTransition = clarity_opt('page_transition', 'fade-scale');
 $preconnect = clarity_parse_lines((string) clarity_opt('preconnect_urls', ''));
+$customHeadHtml = trim((string) clarity_opt('headhtml', ''));
 ?>
 <!doctype html>
 <html lang="zh-CN" data-page-transition="<?php echo htmlspecialchars($pageTransition, ENT_QUOTES, 'UTF-8'); ?>" data-nav-active="<?php echo $navActive; ?>">
@@ -183,6 +184,9 @@ $preconnect = clarity_parse_lines((string) clarity_opt('preconnect_urls', ''));
         }
       })();
     </script>
+    <?php if ($customHeadHtml !== ''): ?>
+      <?php echo $customHeadHtml; ?>
+    <?php endif; ?>
     <?php $this->header(); ?>
   </head>
   <body id="clarity-root">

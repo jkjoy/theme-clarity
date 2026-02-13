@@ -11,6 +11,7 @@ $gongan = trim((string) clarity_opt('footer_gongan', ''));
 $enableUptime = clarity_bool(clarity_opt('footer_uptime_kuma', '0'));
 $uptimeBadgeUrl = trim((string) clarity_opt('footer_uptime_kuma_badge', ''));
 $uptimeStatusUrl = trim((string) clarity_opt('footer_uptime_kuma_url', ''));
+$customFooterHtml = trim((string) clarity_opt('footerhtml', ''));
 $isLinksPage = clarity_get('isLinksPage', false);
 $linksRandom = clarity_bool(clarity_opt('links_random', '1'));
 $authError = '';
@@ -169,6 +170,9 @@ $renderIcon = function ($icon) {
         </nav>
 
         <div class="footer-inject">
+          <?php if ($customFooterHtml !== ''): ?>
+            <?php echo $customFooterHtml; ?>
+          <?php endif; ?>
           <?php $this->footer(); ?>
         </div>
 
