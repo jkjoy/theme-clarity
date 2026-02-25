@@ -492,7 +492,7 @@ function themeConfig($form)
         'clarity_links_data',
         null,
         '',
-        _t('友链数据（JSON，Links 插件未启用时使用）'),
+        _t('友链数据（JSON，Enhancement 插件未启用时使用）'),
         _t('示例：[{"title":"友链","description":"","links":[{"name":"站点","url":"https://","logo":"","desc":""}]}]')
     );
     $form->addInput($linksData);
@@ -1368,6 +1368,7 @@ function clarity_bangumi_cache_read(string $uid): ?array
         return null;
     }
     if (time() - (int) $payload['time'] > clarity_bangumi_cache_ttl()) {
+        @unlink($file);
         return null;
     }
     return $payload['data'];
