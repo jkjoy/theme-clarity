@@ -14,7 +14,7 @@ if (!defined('CLARITY_VERSION')) {
 }
 
 if (!defined('CLARITY_BANGUMI_CACHE_TTL')) {
-    define('CLARITY_BANGUMI_CACHE_TTL', 21600);
+    define('CLARITY_BANGUMI_CACHE_TTL', 86400);
 }
 
 if (!defined('CLARITY_GITHUB_UPDATE_TTL')) {
@@ -538,6 +538,15 @@ function themeConfig($form)
         _t('填写后自动从 B 站拉取追番数据并缓存到 /usr/cache')
     );
     $form->addInput($bangumisUid);
+
+    $bangumiCacheMinutes = new \Typecho\Widget\Helper\Form\Element\Text(
+        'clarity_bangumi_cache_minutes',
+        null,
+        '1440',
+        _t('追番缓存时间（分钟）'),
+        _t('默认 1440 分钟（24 小时），最小 1 分钟')
+    );
+    $form->addInput($bangumiCacheMinutes);
 
     $featuredPosts = new \Typecho\Widget\Helper\Form\Element\Text(
         'clarity_featured_posts',
@@ -1323,6 +1332,27 @@ function clarity_bangumi_cache_file(string $uid): string
     return clarity_bangumi_cache_dir() . DIRECTORY_SEPARATOR . 'clarity-bangumis-' . $safeUid . '.json';
 }
 
+function clarity_bangumi_cache_ttl(): int
+{
+    $defaultMinutes = (int) floor((int) CLARITY_BANGUMI_CACHE_TTL / 60);
+    if ($defaultMinutes <= 0) {
+        $defaultMinutes = 1440;
+    }
+
+    $minutes = (int) clarity_opt('bangumi_cache_minutes', (string) $defaultMinutes);
+    if ($minutes <= 0) {
+        $minutes = $defaultMinutes;
+    }
+    if ($minutes < 1) {
+        $minutes = 1;
+    }
+    if ($minutes > 525600) {
+        $minutes = 525600;
+    }
+
+    return $minutes * 60;
+}
+
 function clarity_bangumi_cache_read(string $uid): ?array
 {
     $file = clarity_bangumi_cache_file($uid);
@@ -1337,7 +1367,7 @@ function clarity_bangumi_cache_read(string $uid): ?array
     if (!is_array($payload) || !isset($payload['time'], $payload['data']) || !is_array($payload['data'])) {
         return null;
     }
-    if (time() - (int) $payload['time'] > CLARITY_BANGUMI_CACHE_TTL) {
+    if (time() - (int) $payload['time'] > clarity_bangumi_cache_ttl()) {
         return null;
     }
     return $payload['data'];
