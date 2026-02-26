@@ -2608,15 +2608,189 @@ function clarity_get_post_count(): int
     return (int) ($stat->publishedPostsNum ?? 0);
 }
 
+function clarity_views_cookie_key(): string
+{
+    return 'clarity_contents_views';
+}
+
+function clarity_views_cookie_read(): array
+{
+    $raw = '';
+    if (class_exists('\\Typecho\\Cookie')) {
+        $raw = (string) \Typecho\Cookie::get(clarity_views_cookie_key(), '');
+    } elseif (class_exists('Typecho_Cookie')) {
+        $raw = (string) Typecho_Cookie::get(clarity_views_cookie_key());
+    }
+
+    if ($raw === '') {
+        return [];
+    }
+
+    $items = array_filter(array_map('trim', explode(',', $raw)), function ($item) {
+        return $item !== '';
+    });
+    return array_values(array_unique($items));
+}
+
+function clarity_views_cookie_write(array $items): void
+{
+    $items = array_values(array_unique(array_filter(array_map('strval', $items), function ($item) {
+        return $item !== '';
+    })));
+    if (count($items) > 1000) {
+        $items = array_slice($items, -1000);
+    }
+    $value = implode(',', $items);
+
+    if (class_exists('\\Typecho\\Cookie')) {
+        \Typecho\Cookie::set(clarity_views_cookie_key(), $value);
+    } elseif (class_exists('Typecho_Cookie')) {
+        Typecho_Cookie::set(clarity_views_cookie_key(), $value);
+    }
+}
+
+function clarity_views_cookie_has(int $cid): bool
+{
+    if ($cid <= 0) {
+        return true;
+    }
+    return in_array((string) $cid, clarity_views_cookie_read(), true);
+}
+
+function clarity_views_cookie_add(int $cid): void
+{
+    if ($cid <= 0) {
+        return;
+    }
+    $items = clarity_views_cookie_read();
+    $items[] = (string) $cid;
+    clarity_views_cookie_write($items);
+}
+
+function clarity_views_is_single($post): bool
+{
+    if (!is_object($post) || !method_exists($post, 'is')) {
+        return false;
+    }
+    try {
+        return (bool) $post->is('single');
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+function clarity_views_ensure_column(): bool
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+
+    $exists = false;
+    $db = null;
+    try {
+        $db = \Typecho\Db::get();
+        // If this query succeeds, the column exists even when the table has no rows.
+        $db->fetchRow($db->select('views')->from('table.contents')->limit(1));
+        $exists = true;
+        return true;
+    } catch (\Throwable $e) {
+    }
+
+    try {
+        if (!$db) {
+            $db = \Typecho\Db::get();
+        }
+        $prefix = $db->getPrefix();
+        $adapter = strtolower((string) $db->getAdapterName());
+        if (strpos($adapter, 'pgsql') !== false) {
+            $db->query('ALTER TABLE "' . $prefix . 'contents" ADD COLUMN "views" INT DEFAULT 0');
+        } else {
+            $db->query('ALTER TABLE `' . $prefix . 'contents` ADD `views` INT(10) NOT NULL DEFAULT 0');
+        }
+        $db->fetchRow($db->select('views')->from('table.contents')->limit(1));
+        $exists = true;
+    } catch (\Throwable $e) {
+        $exists = false;
+    }
+
+    return $exists;
+}
+
 function clarity_get_views($post): ?int
 {
+    $cid = isset($post->cid) ? (int) $post->cid : 0;
+    if ($cid <= 0) {
+        return null;
+    }
+
     if (function_exists('get_post_view')) {
-        return (int) get_post_view($post->cid);
+        try {
+            ob_start();
+            $value = get_post_view($post);
+            $echoed = trim((string) ob_get_clean());
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+            if (is_numeric($echoed)) {
+                return (int) $echoed;
+            }
+        } catch (\Throwable $e) {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+        }
+        try {
+            ob_start();
+            $value = get_post_view($cid);
+            $echoed = trim((string) ob_get_clean());
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+            if (is_numeric($echoed)) {
+                return (int) $echoed;
+            }
+        } catch (\Throwable $e) {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+        }
     }
-    if (isset($post->views)) {
-        return (int) $post->views;
+
+    if (!clarity_views_ensure_column()) {
+        if (isset($post->views)) {
+            return (int) $post->views;
+        }
+        return null;
     }
-    return null;
+
+    try {
+        $db = \Typecho\Db::get();
+        $row = $db->fetchRow(
+            $db->select('views')
+                ->from('table.contents')
+                ->where('cid = ?', $cid)
+                ->limit(1)
+        );
+        $views = isset($row['views']) ? (int) $row['views'] : 0;
+
+        if (clarity_views_is_single($post) && !clarity_views_cookie_has($cid)) {
+            $views++;
+            $db->query(
+                $db->update('table.contents')
+                    ->rows(['views' => $views])
+                    ->where('cid = ?', $cid)
+            );
+            clarity_views_cookie_add($cid);
+        }
+
+        return $views;
+    } catch (\Throwable $e) {
+        if (isset($post->views)) {
+            return (int) $post->views;
+        }
+        return null;
+    }
 }
 
 function clarity_should_show_toc($widget, string $type): bool
