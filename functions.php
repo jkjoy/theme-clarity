@@ -2414,9 +2414,21 @@ function clarity_get_cover($post): string
 
 function clarity_get_excerpt($post, int $length = 120): string
 {
+    $decodeExcerptText = static function (string $text): string {
+        $decoded = $text;
+        for ($i = 0; $i < 2; $i++) {
+            $next = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($next === $decoded) {
+                break;
+            }
+            $decoded = $next;
+        }
+        return trim(strip_tags($decoded));
+    };
+
     $summary = clarity_get_custom_field_value($post, 'summary');
     if ($summary !== '') {
-        $summaryText = trim(strip_tags($summary));
+        $summaryText = $decodeExcerptText($summary);
         if ($summaryText !== '') {
             if ($length > 0) {
                 return \Typecho\Common::subStr($summaryText, 0, $length, '...');
@@ -2426,7 +2438,7 @@ function clarity_get_excerpt($post, int $length = 120): string
     }
     ob_start();
     $post->excerpt($length, '...');
-    return trim((string) ob_get_clean());
+    return $decodeExcerptText((string) ob_get_clean());
 }
 
 function clarity_render_author_capsule($post): void
