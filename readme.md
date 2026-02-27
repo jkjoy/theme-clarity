@@ -68,6 +68,7 @@
 - `瞬间页面标题`
 - `Enhancement` 插件已启用时，瞬间数据自动读取插件表
 - `微语数据（JSON）`（侧边栏与瞬间页共用,未启用`Enhancement`时使用此配置）
+- 支持定位显示，可使用 `location`（推荐）或 `location_address` + `latitude` + `longitude`
   - 示例：
     ```json
     [
@@ -77,6 +78,12 @@
         "time": "2025-01-01 12:00",
         "tags": ["生活"],
         "media": [{"type":"PHOTO","url":""}],
+        "status": "public",
+        "location": "上海市浦东新区世纪大道",
+        "location_address": "上海市浦东新区世纪大道",
+        "latitude": "31.2397",
+        "longitude": "121.4998",
+        "source": "web",
         "likes": 0,
         "comments": 0
       }
