@@ -156,6 +156,19 @@ $paged = array_slice($filtered, $offset, $pageSize);
       $comments = (int) ($moment['comments'] ?? 0);
       $statusRaw = strtolower(trim((string) ($moment['status'] ?? 'public')));
       $isPrivate = $statusRaw === 'private';
+      $sourceText = strtolower(trim((string) ($moment['source'] ?? 'web')));
+      if (!in_array($sourceText, ['web', 'mobile', 'api'], true)) {
+          $sourceText = 'web';
+      }
+      $sourceIconName = 'desktop';
+      if ($sourceText === 'mobile') {
+          $sourceIconName = 'device-mobile';
+      } elseif ($sourceText === 'api') {
+          $sourceIconName = 'webhooks-logo';
+      } elseif ($sourceText !== 'web') {
+          $sourceIconName = 'desktop';
+      }
+      $sourceIconUrl = 'https://api.iconify.design/ph/' . rawurlencode($sourceIconName) . '.svg';
       $locationText = trim((string) ($moment['location'] ?? ''));
       if ($locationText === '') {
           $locationAddress = trim((string) ($moment['location_address'] ?? ''));
@@ -246,6 +259,10 @@ $paged = array_slice($filtered, $offset, $pageSize);
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars((string) $locationText, ENT_QUOTES, 'UTF-8'); ?></span>
               </span>
             <?php endif; ?>
+            <span class="action-btn source" title="<?php echo htmlspecialchars('来源：' . (string) $sourceText, ENT_QUOTES, 'UTF-8'); ?>" style="max-width:10rem;">
+              <span class="iconify-mask" aria-hidden="true" style="--icon-url:url('<?php echo htmlspecialchars($sourceIconUrl, ENT_QUOTES, 'UTF-8'); ?>')"></span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars((string) $sourceText, ENT_QUOTES, 'UTF-8'); ?></span>
+            </span>
             <button class="action-btn share" title="复制链接" data-url="<?php echo htmlspecialchars('#' . $momentId, ENT_QUOTES, 'UTF-8'); ?>" onclick="(function(btn){ var text = location.origin + location.pathname + location.search + btn.dataset.url; if (window.clarityCopyText) { window.clarityCopyText(text); } else if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text); } btn.classList.add('copied'); setTimeout(function(){ btn.classList.remove('copied'); }, 2000); })(this);">
               <span class="icon-[ph--link-bold]"></span>
             </button>
