@@ -9,9 +9,7 @@
 clarity_set('showAside', true);
 clarity_set('pageTitle', null);
 clarity_set('isLinksPage', false);
-?>
-<?php $this->need('header.php'); ?>
-<?php
+$this->need('header.php');
 $logoFallback = \Typecho\Common::url('assets/images/logo.svg', $this->options->themeUrl);
 $logo = clarity_site_logo($logoFallback);
 $showTitle = clarity_bool(clarity_opt('show_title', '1'));
