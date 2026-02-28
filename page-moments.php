@@ -169,17 +169,7 @@ $paged = array_slice($filtered, $offset, $pageSize);
           $sourceIconName = 'desktop';
       }
       $sourceIconUrl = 'https://api.iconify.design/ph/' . rawurlencode($sourceIconName) . '.svg';
-      $locationText = trim((string) ($moment['location'] ?? ''));
-      if ($locationText === '') {
-          $locationAddress = trim((string) ($moment['location_address'] ?? ''));
-          $latitude = trim((string) ($moment['latitude'] ?? ''));
-          $longitude = trim((string) ($moment['longitude'] ?? ''));
-          if ($locationAddress !== '') {
-              $locationText = $locationAddress;
-          } elseif ($latitude !== '' && $longitude !== '') {
-              $locationText = $latitude . ',' . $longitude;
-          }
-      }
+      $locationText = trim((string) ($moment['location_address'] ?? ''));
       if ($isPrivate) {
           $locationText = '';
       }
@@ -254,12 +244,12 @@ $paged = array_slice($filtered, $offset, $pageSize);
 
           <div class="moment-actions">
             <?php if ($locationText !== ''): ?>
-              <span class="action-btn location" title="<?php echo htmlspecialchars('定位：' . (string) $locationText, ENT_QUOTES, 'UTF-8'); ?>" style="max-width:16rem;">
+              <span class="action-btn location" title="位置信息" style="max-width:16rem;">
                 <span class="icon-[ph--map-pin-bold]"></span>
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars((string) $locationText, ENT_QUOTES, 'UTF-8'); ?></span>
               </span>
             <?php endif; ?>
-            <span class="action-btn source" title="<?php echo htmlspecialchars('来源：' . (string) $sourceText, ENT_QUOTES, 'UTF-8'); ?>" style="max-width:10rem;">
+            <span class="action-btn source" title="<?php echo htmlspecialchars('使用' . (string) $sourceText . '发布', ENT_QUOTES, 'UTF-8'); ?>" style="max-width:10rem;">
               <span class="iconify-mask" aria-hidden="true" style="--icon-url:url('<?php echo htmlspecialchars($sourceIconUrl, ENT_QUOTES, 'UTF-8'); ?>')"></span>
               <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars((string) $sourceText, ENT_QUOTES, 'UTF-8'); ?></span>
             </span>
