@@ -4,9 +4,9 @@
 
 一款注重阅读体验的三栏博客主题，用清晰的设计让阅读回归本真。
 
-[![Halo](https://img.shields.io/badge/Typecho-1.2.1+-blue?style=flat-square)](https://typecho.org/)
+[![Typecho](https://img.shields.io/badge/Typecho-1.2.1+-blue?style=flat-square)](https://typecho.org/)
 [![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square)](./LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.3-orange?style=flat-square)](./readme.md)
+[![Version](https://img.shields.io/badge/Version-1.1.5-orange?style=flat-square)](./readme.md)
 
 [🌐 预览站点](https://www.laosun.de)
 
@@ -101,6 +101,48 @@
 ## 📌 说明
 
 - 天气组件需填写心知天气 API Key。
+
+## 🧪 数据库兼容回归清单
+
+> 目标：确认主题在 Typecho 支持的数据库适配器下行为一致  
+> 范围：`Mysqli/Pdo_Mysql`、`Pgsql/Pdo_Pgsql`、`SQLite/Pdo_SQLite`
+
+### 1. 通用检查（每个数据库都执行）
+
+- 全新启用主题后进入 `外观 -> 设置外观`，修改任意字段并保存，刷新后值保持不变。
+- 配置中输入包含中文与 emoji（如：`📄,🦌,🙌`），保存后刷新确认不丢失。
+- 打开“归档”页面（`page-archives.php`），确认有文章时不显示“暂无归档”。
+- 打开一篇文章详情页，确认上下篇导航可正常显示。
+- 评论区存在回复关系时，确认“回复给某某”显示正常（父评论作者可读）。
+- 若启用 `Enhancement` 插件：
+  - 友链页能读取分组数据；
+  - 瞬间页能读取插件 moments 数据。
+- 打开任意文章详情页两次，确认浏览量逻辑正常（首次进入 +1，同会话内重复打开不重复累加）。
+
+### 2. 分库专项检查
+
+#### MySQL / MariaDB
+
+- 确认数据库字符集为 `utf8mb4`（库、表、连接都建议一致）。
+- 主题设置可保存 emoji，不出现“保存后被截断/清空”。
+
+#### PostgreSQL
+
+- 首次打开文章页时，若自动创建 `views` 列，页面不报错。
+- 执行过一次浏览量写入后，再次访问文章页无 SQL 异常。
+
+#### SQLite
+
+- 首次打开文章页时，`views` 列自动补齐后不报错。
+- 友链/瞬间插件数据读取正常（若插件已启用且有数据）。
+
+### 3. 失败时的排查入口
+
+- 进入 `外观 -> 设置外观`，查看 `Clarity 设置诊断` 区块。
+- 若提示写入失败，优先检查：
+  - 数据库账号是否有 `UPDATE/INSERT/ALTER` 权限；
+  - 数据库字符集是否支持 emoji（MySQL 建议 `utf8mb4`）；
+  - 表结构是否被第三方插件或历史迁移改动。
 
 ## 🙏 致谢
 - Halo 主题 [Clarity](https://github.com/acanyo/theme-clarity)

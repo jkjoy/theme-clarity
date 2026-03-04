@@ -785,6 +785,22 @@ function themeConfig($form)
         $backupListHtml = '<div class="description">' . _t('暂无备份') . '</div>';
     }
 
+    $diag = clarity_theme_diag_pull();
+    if (is_array($diag) && !empty($diag['message'])) {
+        $diagType = (string) ($diag['type'] ?? 'error');
+        $diagColor = '#d14343';
+        if ($diagType === 'warn') {
+            $diagColor = '#b78103';
+        } elseif ($diagType === 'success') {
+            $diagColor = '#1a7f37';
+        }
+        $diagMsg = nl2br(htmlspecialchars((string) $diag['message'], ENT_QUOTES, 'UTF-8'));
+        echo '<ul class="typecho-option"><li>';
+        echo '<label class="typecho-label">' . _t('Clarity 设置诊断') . '</label>';
+        echo '<div class="description" style="color:' . $diagColor . ';">' . $diagMsg . '</div>';
+        echo '</li></ul>';
+    }
+
     if (is_array($updateInfo) && !empty($updateInfo['latest'])) {
         echo '<ul class="typecho-option"><li>';
         echo '<label class="typecho-label">' . _t('Clarity主题更新') . '</label>';
@@ -900,8 +916,14 @@ function themeConfigHandle($settings, $isInit)
         }
         if ($restore && is_array($restore['data'] ?? null)) {
             $data = clarity_theme_clean_settings($restore['data']);
-            clarity_theme_save_options($data);
-            \Widget\Notice::alloc()->set(_t('已恢复备份设置'), 'success');
+            $saveError = '';
+            if (clarity_theme_save_options_checked($data, $saveError)) {
+                \Widget\Notice::alloc()->set(_t('已恢复备份设置'), 'success');
+            } else {
+                $msg = _t('恢复备份失败：%s', $saveError !== '' ? $saveError : _t('未知错误'));
+                clarity_theme_diag_set($msg, 'error');
+                \Widget\Notice::alloc()->set($msg, 'error');
+            }
         } else {
             \Widget\Notice::alloc()->set(_t('备份不存在或数据无效'), 'error');
         }
@@ -909,7 +931,11 @@ function themeConfigHandle($settings, $isInit)
     }
 
     $clean = clarity_theme_clean_settings($settings);
-    clarity_theme_save_options($clean);
+    $saveError = '';
+    if (!clarity_theme_save_options_checked($clean, $saveError)) {
+        $msg = _t('主题设置保存失败：%s', $saveError !== '' ? $saveError : _t('未知错误'));
+        clarity_theme_diag_set($msg, 'error');
+    }
     return true;
 }
 
@@ -1078,6 +1104,71 @@ function clarity_db_set_option_value(string $name, string $value): void
     }
 }
 
+function clarity_json_encode_for_storage($data): ?string
+{
+    $flags = JSON_UNESCAPED_SLASHES;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+    $encoded = json_encode($data, $flags);
+    return is_string($encoded) ? $encoded : null;
+}
+
+function clarity_theme_diag_cookie_key(): string
+{
+    return '__clarity_theme_diag';
+}
+
+function clarity_theme_diag_set(string $message, string $type = 'error'): void
+{
+    $payload = clarity_json_encode_for_storage([
+        'message' => $message,
+        'type' => $type,
+        'time' => time(),
+    ]);
+    if (!is_string($payload) || $payload === '') {
+        return;
+    }
+
+    if (class_exists('\\Typecho\\Cookie')) {
+        \Typecho\Cookie::set(clarity_theme_diag_cookie_key(), $payload);
+    } elseif (class_exists('Typecho_Cookie')) {
+        Typecho_Cookie::set(clarity_theme_diag_cookie_key(), $payload);
+    }
+}
+
+function clarity_theme_diag_pull(): ?array
+{
+    $raw = '';
+    if (class_exists('\\Typecho\\Cookie')) {
+        $raw = (string) \Typecho\Cookie::get(clarity_theme_diag_cookie_key(), '');
+        \Typecho\Cookie::delete(clarity_theme_diag_cookie_key());
+    } elseif (class_exists('Typecho_Cookie')) {
+        $raw = (string) Typecho_Cookie::get(clarity_theme_diag_cookie_key());
+        Typecho_Cookie::delete(clarity_theme_diag_cookie_key());
+    }
+
+    if ($raw === '') {
+        return null;
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data) || empty($data['message'])) {
+        return null;
+    }
+
+    $type = (string) ($data['type'] ?? 'error');
+    if (!in_array($type, ['error', 'warn', 'success'], true)) {
+        $type = 'error';
+    }
+
+    return [
+        'message' => (string) ($data['message'] ?? ''),
+        'type' => $type,
+        'time' => (int) ($data['time'] ?? 0),
+    ];
+}
+
 function clarity_theme_option_key(): string
 {
     return 'theme:' . clarity_theme_name();
@@ -1105,11 +1196,42 @@ function clarity_theme_read_options(): array
 
 function clarity_theme_save_options(array $settings): void
 {
-    $value = json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($value === false) {
-        return;
+    $error = '';
+    clarity_theme_save_options_checked($settings, $error);
+}
+
+function clarity_theme_save_options_checked(array $settings, ?string &$error = null): bool
+{
+    $error = '';
+
+    $value = clarity_json_encode_for_storage($settings);
+    if (!is_string($value) || $value === '') {
+        $error = _t('JSON 编码失败，可能包含非法字符');
+        return false;
     }
+
     clarity_db_set_option_value(clarity_theme_option_key(), $value);
+
+    $savedRaw = clarity_db_get_option_value(clarity_theme_option_key());
+    if (!is_string($savedRaw) || $savedRaw === '') {
+        $error = _t('写入后未读取到配置，请检查数据库写入权限');
+        return false;
+    }
+
+    if ($savedRaw !== $value) {
+        $savedData = json_decode($savedRaw, true);
+        $newData = json_decode($value, true);
+        if (!is_array($savedData)) {
+            $error = _t('写入后读取到的配置格式异常，可能是数据库字符集不兼容');
+            return false;
+        }
+        if (!is_array($newData) || $savedData !== $newData) {
+            $error = _t('写入后数据与提交不一致，可能被数据库截断或编码转换');
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function clarity_theme_clean_settings(array $settings): array
@@ -1130,8 +1252,8 @@ function clarity_theme_backups_read(): array
 
 function clarity_theme_backups_write(array $backups): void
 {
-    $value = json_encode(array_values($backups), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($value === false) {
+    $value = clarity_json_encode_for_storage(array_values($backups));
+    if (!is_string($value) || $value === '') {
         return;
     }
     clarity_db_set_option_value(clarity_theme_backup_key(), $value);
@@ -1192,10 +1314,10 @@ function clarity_github_update_info(string $repo): ?array
         'need_update' => $needUpdate,
     ];
 
-    clarity_db_set_option_value(
-        clarity_theme_update_key(),
-        json_encode(['time' => time(), 'data' => $info], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    );
+    $cachePayload = clarity_json_encode_for_storage(['time' => time(), 'data' => $info]);
+    if (is_string($cachePayload) && $cachePayload !== '') {
+        clarity_db_set_option_value(clarity_theme_update_key(), $cachePayload);
+    }
 
     $info['checked_at'] = date('Y-m-d H:i:s');
     return $info;
@@ -1852,8 +1974,7 @@ function clarity_links_groups(): array
     if ($useEnhancement || $useLinks) {
         try {
             $db = \Typecho\Db::get();
-            $prefix = $db->getPrefix();
-            $sql = $db->select()->from($prefix . 'links')->order($prefix . 'links.order', \Typecho\Db::SORT_ASC);
+            $sql = $db->select()->from('table.links')->order('table.links.order', \Typecho\Db::SORT_ASC);
             $links = $db->fetchAll($sql);
         } catch (\Throwable $e) {
             $links = [];
@@ -2057,8 +2178,7 @@ function clarity_moments_items(int $limit = 0): array
     if (isset($options->plugins['activated']['Enhancement'])) {
         try {
             $db = \Typecho\Db::get();
-            $prefix = $db->getPrefix();
-            $sql = $db->select()->from($prefix . 'moments')->order($prefix . 'moments.mid', \Typecho\Db::SORT_DESC);
+            $sql = $db->select()->from('table.moments')->order('table.moments.mid', \Typecho\Db::SORT_DESC);
             if ($limit > 0) {
                 $sql = $sql->limit($limit);
             }
@@ -2727,12 +2847,20 @@ function clarity_views_ensure_column(): bool
         if (!$db) {
             $db = \Typecho\Db::get();
         }
-        $prefix = $db->getPrefix();
+        $adapterObj = method_exists($db, 'getAdapter') ? $db->getAdapter() : null;
+        $quoteColumn = ($adapterObj && method_exists($adapterObj, 'quoteColumn'))
+            ? [$adapterObj, 'quoteColumn']
+            : null;
+        $tableName = $db->getPrefix() . 'contents';
+        $tableSql = $quoteColumn ? call_user_func($quoteColumn, $tableName) : $tableName;
+        $viewsColumnSql = $quoteColumn ? call_user_func($quoteColumn, 'views') : 'views';
         $adapter = strtolower((string) $db->getAdapterName());
         if (strpos($adapter, 'pgsql') !== false) {
-            $db->query('ALTER TABLE "' . $prefix . 'contents" ADD COLUMN "views" INT DEFAULT 0');
+            $db->query('ALTER TABLE ' . $tableSql . ' ADD COLUMN ' . $viewsColumnSql . ' INTEGER DEFAULT 0');
+        } elseif (strpos($adapter, 'sqlite') !== false) {
+            $db->query('ALTER TABLE ' . $tableSql . ' ADD COLUMN ' . $viewsColumnSql . ' INTEGER NOT NULL DEFAULT 0');
         } else {
-            $db->query('ALTER TABLE `' . $prefix . 'contents` ADD `views` INT(10) NOT NULL DEFAULT 0');
+            $db->query('ALTER TABLE ' . $tableSql . ' ADD ' . $viewsColumnSql . ' INT(10) NOT NULL DEFAULT 0');
         }
         $db->fetchRow($db->select('views')->from('table.contents')->limit(1));
         $exists = true;

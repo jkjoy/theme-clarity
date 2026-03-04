@@ -17,31 +17,69 @@ $ownerBirthday = trim((string) clarity_opt('owner_birthday', ''));
 $archivesYears = clarity_bool(clarity_opt('archives_years', '1')) ? 'true' : 'false';
 
 $groups = [];
+$pageSize = 0;
 try {
     $stat = \Typecho\Widget::widget('Widget_Stat');
-    $pageSize = (int) ($stat->publishedPostsNum ?? 0);
+    $pageSize = max(0, (int) ($stat->publishedPostsNum ?? 0));
+} catch (\Throwable $e) {
+}
+
+if ($pageSize <= 0) {
+    try {
+        $db = \Typecho\Db::get();
+        $counter = $db->fetchObject(
+            $db->select(['COUNT(cid)' => 'num'])
+                ->from('table.contents')
+                ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.status = ?', 'publish')
+        );
+        $pageSize = max(0, (int) ($counter->num ?? 0));
+    } catch (\Throwable $e) {
+        $pageSize = 0;
+    }
+}
+
+try {
     if ($pageSize > 0) {
         \Typecho\Widget::widget('Widget_Contents_Post_Recent', 'pageSize=' . $pageSize)->to($archives);
         while ($archives->next()) {
-            $year = date('Y', (int) $archives->created);
-            $month = date('n', (int) $archives->created);
-            if (!isset($groups[$year])) {
-                $groups[$year] = ['year' => $year, 'months' => []];
+            try {
+                $created = (int) ($archives->created ?? 0);
+                if ($created <= 0) {
+                    continue;
+                }
+
+                $year = date('Y', $created);
+                $month = date('n', $created);
+                if (!isset($groups[$year])) {
+                    $groups[$year] = ['year' => $year, 'months' => []];
+                }
+                if (!isset($groups[$year]['months'][$month])) {
+                    $groups[$year]['months'][$month] = [];
+                }
+                $groups[$year]['months'][$month][] = [
+                    'title' => $archives->title ?? '',
+                    'permalink' => $archives->permalink ?? '',
+                    'created' => $created,
+                    'excerpt' => clarity_get_excerpt($archives, 120),
+                    'cover' => clarity_get_cover($archives)
+                ];
+            } catch (\Throwable $e) {
+                continue;
             }
-            if (!isset($groups[$year]['months'][$month])) {
-                $groups[$year]['months'][$month] = [];
-            }
-            $groups[$year]['months'][$month][] = [
-                'title' => $archives->title,
-                'permalink' => $archives->permalink,
-                'created' => (int) $archives->created,
-                'excerpt' => clarity_get_excerpt($archives, 120),
-                'cover' => clarity_get_cover($archives)
-            ];
         }
     }
 } catch (\Throwable $e) {
-    $groups = [];
+}
+
+if (!empty($groups)) {
+    krsort($groups, SORT_NUMERIC);
+    foreach ($groups as &$yearGroup) {
+        if (isset($yearGroup['months']) && is_array($yearGroup['months'])) {
+            krsort($yearGroup['months'], SORT_NUMERIC);
+        }
+    }
+    unset($yearGroup);
 }
 ?>
 

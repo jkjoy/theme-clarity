@@ -25,10 +25,9 @@ if (!function_exists('threadedComments')) {
                 } else {
                     try {
                         $db = \Typecho\Db::get();
-                        $prefix = $db->getPrefix();
                         $row = $db->fetchRow(
                             $db->select('author')
-                                ->from($prefix . 'comments')
+                                ->from('table.comments')
                                 ->where('coid = ?', $parentId)
                                 ->limit(1)
                         );
