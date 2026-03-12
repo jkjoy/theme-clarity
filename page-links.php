@@ -30,6 +30,7 @@ $myDesc = $myInfo['description'] ?? $siteSubtitle;
 $myRss = $myInfo['rss'] ?? $this->options->feedUrl;
 $linksApply = trim((string) clarity_opt('links_apply', ''));
 $enhancementEnabled = isset($this->options->plugins['activated']['Enhancement']);
+$enhancementTurnstileRequired = $enhancementEnabled && class_exists('Enhancement_Plugin') && Enhancement_Plugin::turnstileReady();
 $enhancementAction = $enhancementEnabled ? Helper::security()->getIndex('/action/enhancement-submit') : '';
 $enhancementSubmitted = $this->request->get('enhancement_submitted') ? true : false;
 
@@ -253,7 +254,7 @@ if (is_array($groups)) {
                   <input type="hidden" name="user" value="" />
                   <input type="hidden" name="do" value="submit" />
                   <div class="comment-actions">
-                    <?php if (class_exists('Enhancement_Plugin') && Enhancement_Plugin::turnstileReady()):echo Enhancement_Plugin::turnstileRenderBlock('link-submit'); endif; ?>
+                    <?php if ($enhancementTurnstileRequired):echo Enhancement_Plugin::turnstileRenderBlock('link-submit'); endif; ?>
                     <button type="submit" class="z-btn primary" id="enhancement-submit-btn">
                       <span class="icon-[ph--paper-plane-right-bold]"></span>
                       <span>提交申请</span>
@@ -284,7 +285,12 @@ if (is_array($groups)) {
 </button>
 
 <script>
-  window.linkSubmitConfig = { enableSubmit: false, enableUpdate: false, verifyType: 'email' };
+  window.linkSubmitConfig = {
+    enableSubmit: false,
+    enableUpdate: false,
+    verifyType: 'email',
+    turnstileRequired: <?php echo $enhancementTurnstileRequired ? 'true' : 'false'; ?>
+  };
   window.clarityLinks = <?php echo json_encode($flatLinks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
   window.randomVisitLink = window.randomVisitLink || function () {
@@ -327,6 +333,7 @@ if (is_array($groups)) {
       const submitBtn = document.getElementById('enhancement-submit-btn');
       const messageBox = document.getElementById('submit-message');
       const turnstileEl = enhancementForm.querySelector('.cf-turnstile');
+      const turnstileRequired = !!window.linkSubmitConfig?.turnstileRequired;
       const iconMap = { success: '✓', error: '✕', info: 'i' };
 
       const showMessage = (text, type = 'info') => {
@@ -348,7 +355,7 @@ if (is_array($groups)) {
         }
 
         const token = enhancementForm.querySelector('input[name="cf-turnstile-response"]')?.value || '';
-        if (!token) {
+        if (turnstileRequired && !token) {
           showMessage('请先完成人机验证', 'error');
           return;
         }
